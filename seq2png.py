@@ -27,7 +27,30 @@ import glob
 from PIL import Image, ImageDraw
 import re
 import shutil
-from absl import app, flags,logging
+from absl import app, flags
+
+FLAGS = flags.FLAGS
+# Input sequential-formed dataset directory
+flags.DEFINE_string(
+    'input_dir',
+    'dataset_path',
+    'The directory in which to find the original dataset.'
+)
+# Output pixel-formed dataset directory
+flags.DEFINE_string(
+    'output_dir',
+    'output_path',
+    'The directory in which to output the translated dataset.'
+)
+flags.DEFINE_integer(
+    'png_width', 48,
+    'The width of the output pixel-formed sketch image.'
+)
+# Category to be translated
+flags.DEFINE_multi_string(
+    'categories', {'cat', 'pig'},
+    'The sketch category to be translated to the pixel form from the sequential form.'
+)
 
 def get_bounds(data):
   """Return bounds of data."""
@@ -137,29 +160,6 @@ def sort_paths(paths):
     return paths
 
 def main(argv):
-    FLAGS = flags.FLAGS
-
-    # Input sequential-formed dataset directory
-    flags.DEFINE_string(
-        'input_dir',
-        'dataset_path',
-        'The directory in which to find the original dataset.'
-    )
-    # Output pixel-formed dataset directory
-    flags.DEFINE_string(
-        'output_dir',
-        'output_path',
-        'The directory in which to output the translated dataset.'
-    )
-    flags.DEFINE_integer(
-        'png_width', 48,
-        'The width of the output pixel-formed sketch image.'
-    )
-    # Category to be translated
-    flags.DEFINE_multi_string(
-        'categories', {'cat','pig'},
-        'The sketch category to be translated to the pixel form from the sequential form.'
-    )
 
     dataset = FLAGS.categories
     in_dir = FLAGS.input_dir
