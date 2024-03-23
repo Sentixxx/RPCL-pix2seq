@@ -37,12 +37,15 @@ from model import Model
 import utils
 import matplotlib.pyplot as plt
 from hparam import HParams
-from absl import app, flags,logging
+from absl import app, flags
 
 plt.switch_backend('agg')
 tf.compat.v1.disable_v2_behavior()
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 tf.compat.v1.disable_eager_execution()
+
+logger = tf.get_logger()
+logger.setLevel('INFO')
+
 FLAGS = tf.compat.v1.app.flags.FLAGS
 
 # Dataset directory
