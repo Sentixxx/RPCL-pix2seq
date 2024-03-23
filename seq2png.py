@@ -166,11 +166,11 @@ def main(argv):
     out_dir = FLAGS.output_dir
 
     # seq2svg
-    for category in range(len(dataset)):
-        train_strokes, valid_strokes, test_strokes = load_dataset(in_dir, dataset[category]+'.npz')
-
+    print(dataset)
+    for category in dataset:
+        train_strokes, valid_strokes, test_strokes = load_dataset(in_dir,category+'.npz')
         print('finish loading files')
-        out_path = os.path.join(out_dir, dataset[category])
+        out_path = os.path.join(out_dir, category)
         if os.path.exists(out_path) is False:
             os.makedirs(out_path)
         svg_path = os.path.join(out_path, 'svg')
