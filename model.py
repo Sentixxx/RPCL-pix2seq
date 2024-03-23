@@ -32,21 +32,23 @@ class Model(tf.keras.Model):
     def config_model(self,input_seqs,input_pngs):
         """ Model configuration """
         self.k = self.hps.num_mixture * self.hps.num_sub  # Gaussian number
-        self.global_ = tf.Variable(tf.keras.initializers.Ones(shape=[],dtype=tf.float32), name='num_of_steps', trainable=False, use_resource=True)
+        self.global_ = tf.Variable(tf.keras.initializers.Ones()(dtype=tf.float32,shape=[]), name='num_of_steps', trainable=False)
         # self.global_ = tf.compat.v1.get_variable(name='num_of_steps', shape=[], initializer=tf.compat.v1.ones_initializer(dtype=tf.float32), trainable=False,use_resource=True)
-        self.de_mu = tf.Variable(tf.keras.initializers.RandomUniform(minval=-1., maxval=1., dtype=tf.float32)(shape = [self.k, self.hps.z_size]), name='latent_mu', trainable=False, use_resource=True)
+        self.de_mu = tf.Variable(tf.keras.initializers.RandomUniform(minval=-1., maxval=1.)( dtype=tf.float32,shape = [self.k, self.hps.z_size]), name='latent_mu', trainable=False)
         # self.de_mu = tf.compat.v1.get_variable(name="latent_mu", shape=[self.k, self.hps.z_size],initializer=tf.compat.v1.random_uniform_initializer(minval=-1., maxval=1., dtype=tf.float32), trainable=False,use_resource=True)
-        self.de_sigma2 = tf.Variable(tf.keras.initializers.Ones(dtype=tf.float32)(shape = [self.k, self.hps.z_size]), name='latent_sigma2', trainable=False, use_resource=True)
+        self.de_sigma2 = tf.Variable(tf.keras.initializers.Ones()(dtype=tf.float32,shape = [self.k, self.hps.z_size]), name='latent_sigma2', trainable=False)
         # self.de_sigma2 = tf.compat.v1.get_variable(name="latent_sigma2", shape=[self.k, self.hps.z_size],initializer=tf.compat.v1.ones_initializer(dtype=tf.float32), trainable=False,use_resource=True)
-        self.de_alpha = tf.Variable(tf.keras.initializers.Constant(value=1. / float(self.k), dtype=tf.float32)(shape = [self.k, 1]), name='latent_alpha', trainable=False, use_resource=True)
+        self.de_alpha = tf.Variable(tf.keras.initializers.Constant(value=1. / float(self.k))(dtype=tf.float32,shape = [self.k, 1]), name='latent_alpha', trainable=False)
         # self.de_alpha = tf.compat.v1.get_variable(name="latent_alpha", shape=[self.k, 1],initializer=tf.compat.v1.constant_initializer(1. / float(self.k), dtype=tf.float32), trainable=False,use_resource=True)
 
 
         # 输入数据
+        self.input_seqs = tf.keras.Input(dtype=tf.float32, shape=(self.hps.batch_size, self.hps.max_seq_len + 1, 5), name="input_seqs")
         # self.input_seqs = tf.compat.v1.placeholder(tf.float32, [self.hps.batch_size, self.hps.max_seq_len + 1, 5], name="input_seqs")
-        # self.input_pngs = tf.compat.v1.placeholder(tf.float32, [self.hps.batch_size, self.hps.png_width, self.hps.png_width], name="input_pngs")
-        # self.input_x = self.input_seqs[:, :self.hps.max_seq_len, :]
-        # self.output_x = self.input_seqs[:, 1:self.hps.max_seq_len + 1, :]
+        self.input_pngs = tf.keras.Input(dtype=tf.float32, shape=(self.hps.batch_size, self.hps.png_width, self.hps.png_width), name="input_pngs")
+        # self.input_pngs = tf.compat.v1.placeholder(tf.float32, [self.hps.batch_size, self.hps.png_width, self.hps.png_width], name="input_pngs")     
+        self.input_x = self.input_seqs[:, :self.hps.max_seq_len, :]
+        self.output_x = self.input_seqs[:, 1:self.hps.max_seq_len + 1, :]
 
         # Decoder cell configuration
         if self.hps.dec_model == 'lstm':
