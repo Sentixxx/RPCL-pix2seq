@@ -46,27 +46,27 @@ tf.compat.v1.disable_eager_execution()
 logger = tf.get_logger()
 logger.setLevel('INFO')
 
-FLAGS = tf.compat.v1.app.flags.FLAGS
+FLAGS = flags.FLAGS
 
 # Dataset directory
-tf.compat.v1.app.flags.DEFINE_string(
+flags.DEFINE_string(
     'data_dir',
     'dataset_path',
     'The directory in which to find the dataset specified in model hparams. '
     )
 
 # Checkpoint directory
-tf.compat.v1.app.flags.DEFINE_string(
+flags.DEFINE_string(
     'log_root', 'checkpoint',
     'Directory to store model checkpoints, tensorboard.')
 
 # Resume training or not
-tf.compat.v1.app.flags.DEFINE_boolean(
+flags.DEFINE_boolean(
     'resume_training', False,
     'Set to true to load previous checkpoint')
 
 # Model parameters (user defined)
-tf.compat.v1.app.flags.DEFINE_string(
+flags.DEFINE_string(
     'hparams', '',
     'Pass in comma-separated key=value pairs such as '
     '\'save_every=40,decay_rate=0.99\' '
@@ -292,10 +292,5 @@ def main(unused_argv):
         model_params.parse(FLAGS.hparams)
     train_model(model_params)
 
-
-def console_entry_point():
-    tf.compat.v1.app.run(main)
-
-
 if __name__ == '__main__':
-    console_entry_point()
+    app.run(main)
