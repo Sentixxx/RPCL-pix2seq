@@ -55,8 +55,6 @@ class Model(tf.keras.Model):
             cell_fn = rnn.LSTMCell
         elif self.hps.dec_model == 'layer_norm':
             cell_fn = rnn.LayerNormLSTMCell
-        elif self.hps.dec_model == 'hyper':
-            cell_fn = rnn.HyperLSTMCell
         else:
             assert False, 'please choose a respectable cell'
 

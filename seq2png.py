@@ -21,10 +21,9 @@ import numpy as np
 import six
 import svgwrite  # conda install -c omnia svgwrite=1.1.6
 import os
-import tensorflow as tf
 import svg2png
 import glob
-from PIL import Image, ImageDraw
+from PIL import Image
 import re
 import shutil
 from absl import app, flags
@@ -166,7 +165,7 @@ def main(argv):
     out_dir = FLAGS.output_dir
 
     # seq2svg
-    print(dataset)
+    #print(dataset)
     for category in dataset:
         train_strokes, valid_strokes, test_strokes = load_dataset(in_dir,category+'.npz')
         print('finish loading files')
