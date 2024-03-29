@@ -20,50 +20,40 @@
 """ Modules for CNN & FC layers"""
 
 import tensorflow as tf
-from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
-tf.compat.v1.disable_eager_execution()
-tf.compat.v1.disable_v2_behavior()
+import tensorflow_addons as tfa
 
-class DilatedConv(object):
-    def __init__(self, specs, inputs, is_training, keep_prob=1.0):
-        self.conv_layers = []
+
+class DilatedConv(tf.keras.layers.Layer):
+    def __init__(self, specs, keep_prob=1.0, **kwargs):
+        super(DilatedConv, self).__init__(**kwargs)
+        self.conv_specs = specs 
         self.keep_prob = keep_prob
-        outputs = inputs
-        for i, (fun_name, w_size, rate, out_channel) in enumerate(specs):
-            self.conv_layers.append(outputs)
-            with tf.compat.v1.variable_scope('conv%d' % i):
-                outputs = self.build_dilated_conv_layer(outputs, w_size, out_channel, rate, fun_name, is_training=is_training)
-        self.conv_layers.append(outputs)
+        self.conv_layers = []
 
-    def xavier_init(self, size):
-        in_dim = size[0]
-        xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
-        return tf.random.normal(shape=size, stddev=xavier_stddev)
+    def build(self, input_shape):
+        for i,(fun_name, w_size, rate, out_channel) in enumerate(self.conv_specs):
+            conv_layer = tf.keras.layers.Conv2D(
+                filters=out_channel,
+                kernel_size=w_size,
+                padding='SAME',
+                dilation_rate=rate,
+                activation=None,
+                use_bias=False,
+                kernel_initializer='glorot_uniform'
+            )
+            bn_layer = tf.keras.layers.BatchNormalization()
+            self.conv_layers.append((conv_layer, bn_layer, fun_name))
 
-    def get_filter(self, name, shape):
-        return tf.compat.v1.get_variable(name, dtype=tf.float32, initializer=self.xavier_init(shape),use_resource=True)
-
-    def select_act_func(self, actfun):
-        if actfun == 'tanh':
-            return tf.nn.tanh
-        elif actfun == 'sigmoid':
-            return tf.sigmoid
-        elif actfun == 'relu':
-            return tf.nn.relu
-        else:
-            return lambda x: x
-
-    def build_dilated_conv_layer(self, inputs, w_size, out_channel, rate, actfun='relu', is_training=True):
-        batch_size, height, width, in_channel = inputs.get_shape().as_list()
-        w = self.get_filter('filter', [w_size[0], w_size[1], in_channel, out_channel])
-        f = self.select_act_func(actfun)
-        conv = tf.compat.v1.nn.atrous_conv2d(inputs, w, rate=rate, padding='SAME')
-        InstanceNormalization()(conv)
-        out = f(conv)
-        return out
+    def call(self, inputs, training=None):
+        x = inputs
+        for conv_layer, bn_layer, fun_name in self.conv_layers:
+            x = conv_layer(x, training=training)
+            x = bn_layer(x, training=training)
+            x = tf.keras.activations.get(fun_name)(x)
+        return x
 
 class ConvNet(object):
-    def __init__(self, specs, inputs, is_training, deconv=False, keep_prob=1.0):
+    def __init__(self, specs, inputs, training, deconv=False, keep_prob=1.0):
         self.conv_layers = []
         self.keep_prob = keep_prob
         outputs = inputs
@@ -71,10 +61,10 @@ class ConvNet(object):
             self.conv_layers.append(outputs)
             if deconv == False:
                 with tf.compat.v1.variable_scope('conv%d' % i):
-                    outputs = self.build_conv_layer(outputs, w_size, out_channel, strides, fun_name, is_training=is_training)
+                    outputs = self.build_conv_layer(outputs, w_size, out_channel, strides, fun_name, training=training)
             else:
                 with tf.compat.v1.variable_scope('deconv%d' % i):
-                    outputs = self.build_deconv_layer(outputs, w_size, out_channel, strides, fun_name, is_training=is_training)
+                    outputs = self.build_deconv_layer(outputs, w_size, out_channel, strides, fun_name, training=training)
         self.conv_layers.append(outputs)
 
     def xavier_init(self, size):
@@ -95,7 +85,7 @@ class ConvNet(object):
         else:
             return lambda x: x
 
-    def build_conv_layer(self, inputs, w_size, out_channel, strides=[1, 2, 2, 1], actfun='relu', is_training=True):
+    def build_conv_layer(self, inputs, w_size, out_channel, strides=[1, 2, 2, 1], actfun='relu', training=True):
         batch_size, height, width, in_channel = inputs.get_shape().as_list()
         w = self.get_filter('filter', [w_size[0], w_size[1], in_channel, out_channel])
         f = self.select_act_func(actfun)
@@ -104,7 +94,7 @@ class ConvNet(object):
         out = f(conv)
         return out
 
-    def build_deconv_layer(self, inputs, w_size, out_channel, strides=[1, 2, 2, 1], actfun='relu', is_training=True):
+    def build_deconv_layer(self, inputs, w_size, out_channel, strides=[1, 2, 2, 1], actfun='relu', training=True):
         batch_size, height, width, in_channel = inputs.get_shape().as_list()
         w = self.get_filter('filter', [w_size[0], w_size[1], out_channel, in_channel])
         if strides[1] == 1:
