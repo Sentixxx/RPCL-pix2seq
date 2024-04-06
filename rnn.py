@@ -22,39 +22,19 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa 
-tf.compat.v1.disable_eager_execution()
-tf.compat.v1.disable_v2_behavior()
-def orthogonal(shape):
-  """Orthogonal initilaizer."""
-  flat_shape = (shape[0], np.prod(shape[1:]))
-  a = np.random.normal(0.0, 1.0, flat_shape)
-  u, _, v = np.linalg.svd(a, full_matrices=False)
-  q = u if u.shape == flat_shape else v
-  return q.reshape(shape)
 
-
-def orthogonal_initializer(scale=1.0):
-  """Orthogonal initializer."""
-  def _initializer(shape, dtype=tf.float32, partition_info=None):  # pylint: disable=unused-argument
-    return tf.constant(orthogonal(shape) * scale, dtype)
-
-  return _initializer
-
+orthogonal_initializer = tf.keras.initializers.Orthogonal(gain=1.0)
 
 def lstm_ortho_initializer(scale=1.0):
   """LSTM orthogonal initializer."""
   def _initializer(shape, dtype=tf.float32, partition_info=None):  # pylint: disable=unused-argument
+    assert len(shape) == 2
     size_x = int(shape[0])
     size_h = int(shape[1] / 4)  # Assumes lstm.
-    t = np.zeros(shape)
-    t[:, :size_h] = orthogonal([size_x, size_h]) * scale
-    t[:, size_h:size_h * 2] = orthogonal([size_x, size_h]) * scale
-    t[:, size_h * 2:size_h * 3] = orthogonal([size_x, size_h]) * scale
-    t[:, size_h * 3:] = orthogonal([size_x, size_h]) * scale
+    t = np.concatenate([orthogonal_initializer([size_x, size_h], dtype) * scale for _ in range(4)], axis=1)
     return tf.constant(t, dtype)
 
   return _initializer
-
 
 class LSTMCell(tf.compat.v1.nn.rnn_cell.RNNCell):
   """ Vanilla LSTM cell.
