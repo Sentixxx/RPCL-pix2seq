@@ -93,8 +93,8 @@ class Model(tf.keras.Model):
 
         # Compute decoder initial states and inputs
         fc_spec = [('tanh', self.hps.z_size, self.cell.state_size, 'init_state')]
-        fc_net = Cnn.FcNet(fc_spec, self.batch_z)
-        self.initial_state = fc_net.fc_layers[-1]
+        fc_net = Cnn.FcNet(fc_spec)
+        self.initial_state = fc_net(self.batch_z)
         pre_z = tf.tile(tf.reshape(self.batch_z, [self.hps.batch_size, 1, self.hps.z_size]), [1, self.hps.max_seq_len, 1])
         dec_input = tf.concat([self.input_x, pre_z], axis=2)
 
@@ -152,18 +152,18 @@ class Model(tf.keras.Model):
                 ('relu', (3, 3), [1, 2, 2, 1], 128),
                 ('relu', (3, 3), [1, 2, 2, 1], 256),
             ]
-            cn1 = Cnn.ConvNet(conv_specs, block2_out, self.hps.is_training)
-            cn1_out = cn1.conv_layers[-1]
+            cn1 = Cnn.ConvNet(conv_specs)
+            cn1_out = cn1(block2_out, self.hps.is_training)
             outputs = tf.reshape(cn1_out, shape=[-1, 3 * 3 * 256])
 
             # Compute mean and std_square for the posterior q(z|x)
             fc_spec_mu = [('no', 3 * 3 * 256, self.hps.z_size, 'fc_mu')]
-            fc_net_mu = Cnn.FcNet(fc_spec_mu, outputs)
-            p_mu = fc_net_mu.fc_layers[-1]
+            fc_net_mu = Cnn.FcNet(fc_spec_mu)
+            p_mu = fc_net_mu(outputs)
 
             fc_spec_sigma2 = [('no', 3 * 3 * 256, self.hps.z_size, 'fc_sigma2')]
-            fc_net_sigma2 = Cnn.FcNet(fc_spec_sigma2, outputs)
-            p_sigma2 = fc_net_sigma2.fc_layers[-1]
+            fc_net_sigma2 = Cnn.FcNet(fc_spec_sigma2)
+            p_sigma2 = fc_net_sigma2(outputs)
         return p_mu, tf.nn.softplus(p_sigma2) + 1e-10
 
     def cnn_decoder(self, code):
@@ -171,8 +171,8 @@ class Model(tf.keras.Model):
             fc_spec = [
                 ('relu', self.hps.z_size, 3 * 3 * 256, 'fc1'),
             ]
-            fc_net = Cnn.FcNet(fc_spec, code)
-            fc1 = fc_net.fc_layers[-1]
+            fc_net = Cnn.FcNet(fc_spec)
+            fc1 = fc_net(code)
             fc1 = tf.reshape(fc1, [-1, 3, 3, 256])
 
             de_conv_specs = [
@@ -181,8 +181,9 @@ class Model(tf.keras.Model):
                 ('relu', (3, 3), [1, 2, 2, 1], 32),
                 ('tanh', (3, 3), [1, 2, 2, 1], 1)
             ]
-            conv_net = Cnn.ConvNet(de_conv_specs, fc1, self.hps.is_training, deconv=True)
-        return conv_net.conv_layers[-1]
+            conv_net = Cnn.ConvNet(de_conv_specs, deconv=True)
+
+        return conv_net(fc1, self.hps.is_training)
 
     def rnn_decoder(self, inputs, initial_state):
         # Number of outputs is end_of_stroke + prob + 2 * (mu + sig) + corr
@@ -201,8 +202,8 @@ class Model(tf.keras.Model):
 
             output = tf.reshape(output, [-1, self.hps.dec_rnn_size])
             fc_spec = [('no', self.hps.dec_rnn_size, n_out, 'fc')]
-            fc_net = Cnn.FcNet(fc_spec, output)
-            output = fc_net.fc_layers[-1]
+            fc_net = Cnn.FcNet(fc_spec)
+            output = fc_net(output)
 
             out = self.get_mixture_params(output)
             last_state = tf.identity(last_state, name='last_state')
@@ -275,24 +276,19 @@ class Model(tf.keras.Model):
             return q_mu, q_sigma2, q_alpha_st
 
     def create_dilated_blocks(self, inputs, scope, depth, stride=1):
-        with tf.compat.v1.variable_scope(scope):
-            with tf.compat.v1.variable_scope('dcn1'):
-                dcn1 = Cnn.DilatedConv([('no', (3, 3), 1, depth)], inputs, self.hps.is_training)
-                dcn1_out = dcn1.conv_layers[-1]
+        dcn1 = Cnn.DilatedConv([('no', (3, 3), 1, depth)])
+        dcn1_out = dcn1(inputs, self.hps.is_training)       
 
-            with tf.compat.v1.variable_scope('dcn2'):
-                dcn2 = Cnn.DilatedConv([('no', (3, 3), 2, depth)], inputs, self.hps.is_training)
-                dcn2_out = dcn2.conv_layers[-1]
+        dcn2 = Cnn.DilatedConv([('no', (3, 3), 2, depth)])
+        dcn2_out = dcn2(inputs, self.hps.is_training)
 
-            with tf.compat.v1.variable_scope('dcn3'):
-                dcn3 = Cnn.DilatedConv([('no', (3, 3), 5, depth)], inputs, self.hps.is_training)
-                dcn3_out = dcn3.conv_layers[-1]
+        dcn3 = Cnn.DilatedConv([('no', (3, 3), 5, depth)])
+        dcn3_out = dcn3(inputs, self.hps.is_training)
 
-            with tf.compat.v1.variable_scope('combine'):
-                combine = Cnn.ConvNet([('no', (3, 3), [1, stride, stride, 1], depth)], tf.nn.relu(dcn1_out + dcn2_out + dcn3_out), self.hps.is_training)
-                combine_out = combine.conv_layers[-1]
+        combine = Cnn.ConvNet([('no', (3, 3), [1, stride, stride, 1], depth)])
+        combine_out = combine(tf.concat([dcn1_out, dcn2_out, dcn3_out], axis=3), self.hps.is_training)
 
-            return tf.nn.relu(combine_out)
+        return tf.nn.relu(combine_out)
 
     def get_z(self, mu, sigma2):
         """ Reparameterization """
