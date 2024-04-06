@@ -54,15 +54,16 @@ class DilatedConv(tf.keras.layers.Layer):
         return x
 
 class ConvNet(tf.keras.layers.Layer):
-    def __init__(self, specs,keep_prob=1.0,**kwargs):
+    def __init__(self, specs,keep_prob=1.0,deconv=False,**kwargs):
         super(ConvNet, self).__init__(**kwargs)
         self.specs = specs
         self.keep_prob = keep_prob
         self.conv_layers = []
+        self.deconv = deconv
 
-    def build(self,input_shape,deconv=False):
+    def build(self,input_shape):
         for i, (fun_name, w_size, strides, out_channel) in enumerate(self.specs):
-            if not deconv:
+            if not self.deconv:
                 conv_layer = tf.keras.layers.Conv2D(
                     filters=out_channel,
                     kernel_size=w_size,
