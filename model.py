@@ -52,9 +52,9 @@ class Model(tf.keras.Model):
 
         # Decoder cell configuration
         if self.hps.dec_model == 'lstm':
-            cell_fn = rnn.LSTMCell
-        elif self.hps.dec_model == 'layer_norm':
-            cell_fn = rnn.LayerNormLSTMCell
+            cell_fn = tf.keras.layers.LSTMCell
+        # elif self.hps.dec_model == 'layer_norm':
+        #     cell_fn = tf.keras.layers.LayerNormLSTMCell
         else:
             assert False, 'please choose a respectable cell'
 
