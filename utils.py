@@ -38,7 +38,7 @@ def get_default_hparams():
         num_steps=1000001,  # Number of total steps (the process will stop automatically if the loss is not improved)
         save_every=1,  # Number of epochs before saving model
         dec_rnn_size=2048,  # Size of decoder
-        dec_model='hyper',  # Decoder: lstm, layer_norm or hyper
+        dec_model='lstm',  # Decoder: lstm, layer_norm or hyper
         max_seq_len=-1,  # Max sequence length. Computed by DataLoader
         z_size=128,  # Size of latent variable
         batch_size=200,  # Minibatch size

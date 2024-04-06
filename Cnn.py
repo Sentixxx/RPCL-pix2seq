@@ -54,7 +54,7 @@ class DilatedConv(tf.keras.layers.Layer):
         return x
 
 class ConvNet(tf.keras.layers.Layer):
-    def __init__(self, specs,keep_prob=1.0,deconv=False,**kwargs):
+    def __init__(self, specs, keep_prob=1.0, deconv=False,**kwargs):
         super(ConvNet, self).__init__(**kwargs)
         self.specs = specs
         self.keep_prob = keep_prob

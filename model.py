@@ -64,8 +64,8 @@ class Model(tf.keras.Model):
         use_recurrent_dropout = False if self.hps.use_recurrent_dropout == 0 else True
 
         cell = cell_fn(self.hps.dec_rnn_size,
-                       use_recurrent_dropout=use_recurrent_dropout,
-                       dropout_keep_prob=self.hps.recurrent_dropout_prob)
+                       dropout=use_recurrent_dropout,
+                       recurrent_dropout=1 - self.hps.recurrent_dropout_prob )
 
         if use_input_dropout:
             tf.compat.v1.logging.info('Dropout to input w/ keep_prob = %4.4f.', self.hps.input_dropout_prob)
@@ -145,23 +145,23 @@ class Model(tf.keras.Model):
         with tf.compat.v1.variable_scope('encoder'):
             inputs = tf.reshape(inputs, [-1, self.hps.png_width, self.hps.png_width, 1])
 
-            block1_out = self.create_dilated_blocks(inputs, 'layer_1', 32, 2)
-            block2_out = self.create_dilated_blocks(block1_out, 'layer_2', 64, 2)
+            block1_out = self.create_dilated_blocks(inputs, 32, 2)
+            block2_out = self.create_dilated_blocks(block1_out, 64, 2)
 
             conv_specs = [
-                ('relu', (3, 3), [1, 2, 2, 1], 128),
-                ('relu', (3, 3), [1, 2, 2, 1], 256),
+                ('relu', (3, 3), (2, 2), 128),
+                ('relu', (3, 3), (2, 2), 256),
             ]
             cn1 = Cnn.ConvNet(conv_specs)
             cn1_out = cn1(block2_out, self.hps.is_training)
             outputs = tf.reshape(cn1_out, shape=[-1, 3 * 3 * 256])
 
             # Compute mean and std_square for the posterior q(z|x)
-            fc_spec_mu = [('no', 3 * 3 * 256, self.hps.z_size, 'fc_mu')]
+            fc_spec_mu = [('linear', 3 * 3 * 256, self.hps.z_size, 'fc_mu')]
             fc_net_mu = Cnn.FcNet(fc_spec_mu)
             p_mu = fc_net_mu(outputs)
 
-            fc_spec_sigma2 = [('no', 3 * 3 * 256, self.hps.z_size, 'fc_sigma2')]
+            fc_spec_sigma2 = [('linear', 3 * 3 * 256, self.hps.z_size, 'fc_sigma2')]
             fc_net_sigma2 = Cnn.FcNet(fc_spec_sigma2)
             p_sigma2 = fc_net_sigma2(outputs)
         return p_mu, tf.nn.softplus(p_sigma2) + 1e-10
@@ -201,7 +201,7 @@ class Model(tf.keras.Model):
                 dtype=tf.float32)
 
             output = tf.reshape(output, [-1, self.hps.dec_rnn_size])
-            fc_spec = [('no', self.hps.dec_rnn_size, n_out, 'fc')]
+            fc_spec = [('linear', self.hps.dec_rnn_size, n_out, 'fc')]
             fc_net = Cnn.FcNet(fc_spec)
             output = fc_net(output)
 
@@ -275,18 +275,20 @@ class Model(tf.keras.Model):
 
             return q_mu, q_sigma2, q_alpha_st
 
-    def create_dilated_blocks(self, inputs, scope, depth, stride=1):
-        dcn1 = Cnn.DilatedConv([('no', (3, 3), 1, depth)])
+    def create_dilated_blocks(self, inputs, depth, stride=1):
+        dcn1 = Cnn.DilatedConv([('linear', (3, 3), 1, depth)])
         dcn1_out = dcn1(inputs, self.hps.is_training)       
 
-        dcn2 = Cnn.DilatedConv([('no', (3, 3), 2, depth)])
+        dcn2 = Cnn.DilatedConv([('linear', (3, 3), 2, depth)])
         dcn2_out = dcn2(inputs, self.hps.is_training)
 
-        dcn3 = Cnn.DilatedConv([('no', (3, 3), 5, depth)])
+        dcn3 = Cnn.DilatedConv([('linear', (3, 3), 5, depth)])
         dcn3_out = dcn3(inputs, self.hps.is_training)
 
-        combine = Cnn.ConvNet([('no', (3, 3), [1, stride, stride, 1], depth)])
+        combine = Cnn.ConvNet([('linear', (3, 3), (stride, stride), depth)])
         combine_out = combine(tf.concat([dcn1_out, dcn2_out, dcn3_out], axis=3), self.hps.is_training)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(tf.nn.relu(combine_out))
 
         return tf.nn.relu(combine_out)
 
