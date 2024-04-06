@@ -39,7 +39,8 @@ class DilatedConv(tf.keras.layers.Layer):
                 dilation_rate=rate,
                 activation=None,
                 use_bias=False,
-                kernel_initializer='glorot_uniform'
+                kernel_initializer='glorot_uniform',
+                input_shape=input_shape if i == 0 else None
             )
             bn_layer = tf.keras.layers.BatchNormalization()
             self.conv_layers.append((conv_layer, bn_layer, fun_name))
@@ -61,7 +62,7 @@ class ConvNet(tf.keras.layers.Layer):
 
     def build(self,input_shape,deconv=False):
         for i, (fun_name, w_size, strides, out_channel) in enumerate(self.specs):
-            if not self.deconv:
+            if not deconv:
                 conv_layer = tf.keras.layers.Conv2D(
                     filters=out_channel,
                     kernel_size=w_size,
@@ -69,7 +70,8 @@ class ConvNet(tf.keras.layers.Layer):
                     padding='SAME',
                     activation=None,
                     use_bias=False,
-                    kernel_initializer='glorot_uniform'
+                    kernel_initializer='glorot_uniform',
+                    input_shape=input_shape if i == 0 else None
                 )
             else:
                 conv_layer = tf.keras.layers.Conv2DTranspose(
@@ -79,7 +81,8 @@ class ConvNet(tf.keras.layers.Layer):
                     padding='SAME',
                     activation=None,
                     use_bias=False,
-                    kernel_initializer='glorot_uniform'
+                    kernel_initializer='glorot_uniform',
+                    input_shape=input_shape if i == 0 else None
                 )
         bn_layer = tf.keras.layers.BatchNormalization()
         self.conv_layers.append((conv_layer, bn_layer, fun_name))
@@ -105,7 +108,8 @@ class FcNet(tf.keras.layers.Layer):
                 units=out_channel,
                 activation=None,
                 use_bias=True,
-                kernel_initializer='glorot_uniform'
+                kernel_initializer='glorot_uniform',
+                input_shape=input_shape if i == 0 else None
             )
             self.fc_layers.append((fc_layer, fun_name))
 
