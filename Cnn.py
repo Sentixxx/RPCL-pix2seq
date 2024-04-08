@@ -32,6 +32,7 @@ class DilatedConv(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         for i,(fun_name, w_size, rate, out_channel) in enumerate(self.specs):
+            #with tf.name_scope('conv%d' % i):
             conv_layer = tf.keras.layers.Conv2D(
                 filters=out_channel,
                 kernel_size=w_size,
@@ -40,7 +41,8 @@ class DilatedConv(tf.keras.layers.Layer):
                 activation=None,
                 use_bias=False,
                 kernel_initializer='glorot_uniform',
-                input_shape=input_shape if i == 0 else None
+                input_shape=input_shape if i == 0 else None,
+                #name='conv%d' % i
             )
             bn_layer = tf.keras.layers.BatchNormalization()
             self.conv_layers.append((conv_layer, bn_layer, fun_name))
@@ -64,6 +66,7 @@ class ConvNet(tf.keras.layers.Layer):
     def build(self,input_shape):
         for i, (fun_name, w_size, strides, out_channel) in enumerate(self.specs):
             if not self.deconv:
+            #with tf.name_scope('conv%d' % i):
                 conv_layer = tf.keras.layers.Conv2D(
                     filters=out_channel,
                     kernel_size=w_size,
@@ -72,9 +75,11 @@ class ConvNet(tf.keras.layers.Layer):
                     activation=None,
                     use_bias=False,
                     kernel_initializer='glorot_uniform',
-                    input_shape=input_shape if i == 0 else None
+                    input_shape=input_shape if i == 0 else None,
+                    #name= 'conv%d' % i
                 )
             else:
+            #with tf.name_scope('deconv%d' % i):
                 conv_layer = tf.keras.layers.Conv2DTranspose(
                     filters=out_channel,
                     kernel_size=w_size,
@@ -83,7 +88,8 @@ class ConvNet(tf.keras.layers.Layer):
                     activation=None,
                     use_bias=False,
                     kernel_initializer='glorot_uniform',
-                    input_shape=input_shape if i == 0 else None
+                    input_shape=input_shape if i == 0 else None,
+                    #name='deconv%d' % i
                 )
         bn_layer = tf.keras.layers.BatchNormalization()
         self.conv_layers.append((conv_layer, bn_layer, fun_name))
@@ -104,13 +110,15 @@ class FcNet(tf.keras.layers.Layer):
         self.fc_layers = []
     
     def build(self, input_shape):
-        for i, (fun_name, out_channel) in enumerate(self.specs):
+        for i, (fun_name, out_channel,name) in enumerate(self.specs):
+            #with tf.name_scope(name):
             fc_layer = tf.keras.layers.Dense(
                 units=out_channel,
                 activation=None,
                 use_bias=True,
                 kernel_initializer='glorot_uniform',
-                input_shape=input_shape if i == 0 else None
+                input_shape=input_shape if i == 0 else None,
+                #name=name
             )
             self.fc_layers.append((fc_layer, fun_name))
 
