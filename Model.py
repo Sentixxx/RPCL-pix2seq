@@ -52,6 +52,7 @@ class CnnEncoder(tf.keras.layers.Layer):
         self.conv_net = Cnn.ConvNet(self.conv_specs)
         self.fc_net_mu = Cnn.FcNet(self.fc_spec_mu)
         self.fc_net_sigma2 = Cnn.FcNet(self.fc_spec_sigma2)
+        super(CnnEncoder,self).build(input_shape)
 
     def call(self,inputs,training=None):
         x = inputs
@@ -81,12 +82,52 @@ class CnnDecoder(tf.keras.layers.Layer):
         # maybe we should use the input_shape to build the fc_net and conv_net?
         self.fc_net = Cnn.FcNet(self.fc_spec)
         self.conv_net = Cnn.ConvNet(self.de_conv_specs,deconv=True)
+        super(CnnDecoder,self).build(input_shape)
 
     def call(self,inputs,training=None):
         fc1 = self.fc_net(inputs,training)
         fc1 = tf.reshape(fc1,shape=[-1,3,3,256])
         return self.conv_net(fc1,training)
+
+class rnnDecoder(tf.keras.layers.Layer):
+    def __init__(self,hps,initial_state):
+        super(rnnDecoder,self).__init__(name='decoder')
+        self.hps = hps
+        self.initial_state = initial_state
+        self.n_out = 3 + 20 * 6
+        self.fc_spec = [('linear',self.n_out,'fc')]
+        self.fc_net = Cnn.FcNet(self.fc_spec)
+        
     
+    def build(self,input_shape):
+        self.rnn_layer = tf.keras.layers.RNN(
+            tf.keras.layers.LSTMCell(self.hps.rnn_size), 
+            return_sequences=True, 
+            return_state=True,
+            name='rnn_output'
+        )
+        super(rnnDecoder,self).build(input_shape)
+    
+    def call(self,inputs,training=None):
+        self.output, last_state = self.rnn_layer(inputs, initial_state=self.initial_state)
+        self.output = self.fc_net(self.output,training)
+        out = self.get_mixture_params(self.output)
+        last_state = tf.identity(self.last_state, name='last_state')
+        return out, last_state
+
+    def get_mixture_params(self, output):
+        pen_logits = output[:, 0:3]
+        pi, mu1, mu2, sigma1, sigma2, corr = tf.split(output[:, 3:], 6, 1)
+
+        pi = tf.nn.softmax(pi)
+        pen = tf.nn.softmax(pen_logits)
+
+        sigma1 = tf.exp(sigma1)
+        sigma2 = tf.exp(sigma2)
+        corr = tf.tanh(corr)
+
+        r = [pi, mu1, mu2, sigma1, sigma2, corr, pen, pen_logits]
+        return r
 
 class Model(tf.keras.Model):
     def __init__(self, hps):
@@ -121,28 +162,44 @@ class Model(tf.keras.Model):
             self.output_dropout = None
 
         self.rnn = tf.keras.layers.RNN(cell, return_sequences=True, return_state=True)
+    
+    def build(self, input_shape, training=None):
+        inputseqs , input_pngs = input_shape
+        input_x,output_x = self.prepare_inputs(inputseqs,input_pngs)
+        target = tf.reshape(output_x,[-1,5])
+        self.x1_data, self.x2_data, self.pen_data = tf.split(target, [1, 1, 3], axis=1)
+
+        # CNN encoder
+        self.p_mu, self.p_sigma2 = CnnEncoder(input_pngs,self.hps,training=training)
+        self.batch_z = self.get_z(self.p_mu, self.p_sigma2)
+        #reparameterization
+
+        # Compute decoder initial state and input
+        fc_spec = [('tanh',self.cell.state_size,'init_state')]
+        fc_net = Cnn.FcNet(fc_spec)
+        pre_z = tf.tile(tf.reshape(self.batch_z, [self.hps.batch_size, 1, self.hps.z_size]), [1, self.hps.max_seq_len, 1])
+        dec_input = tf.concat([self.input_x, pre_z], axis=2)
+
+        self.gen_img = CnnDecoder()(dec_input,training=training)
+        # Generation branch
+        self.dec_out, self.last_state = rnnDecoder(dec_input,training=training)
         
-    def call(self, inputs, training=None):
+    def call(self, training=None):
         # Decoder RNN example, assuming 'inputs' is provided via tf.data.Dataset API
-        input_seqs, input_pngs = inputs
+        return
+    
+    def get_z(self, mu, sigma2):
+        """ Reparameterization """
+        sigma = tf.sqrt(sigma2)
+        eps = tf.random.normal((self.hps.batch_size, self.hps.z_size), 0.0, 1.0, dtype=tf.float32)
+        z = tf.add(mu, tf.multiply(sigma, eps), name='z_code')
+        return z
     
     def prepare_inputs(self, input_seqs, input_pngs):
         input_x = input_seqs[:, :self.hps.max_seq_len, :]
         output_x = input_seqs[:, 1:self.hps.max_seq_len + 1, :]
         return input_x, output_x
     
-    def train_step(self, data):
-        input_seqs, input_pngs = data
-        input_x,output_x = self.prepare_inputs(input_seqs, input_pngs)
-
-        with tf.GradiateTape() as tape:
-            predictions = self(inputs, training=True)
-            loss = self.compiled_loss(targets, predictions)
-
-        gradients = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
-        return {'loss': loss}
 
 # Instantiate and compile the model, for example:
 hps = ...  # define your hyperparameters
